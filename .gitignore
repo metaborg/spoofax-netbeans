@@ -6,3 +6,7 @@
 
 # Java
 target/
+
+# Netbeans
+nbproject/
+nbactions.xml
