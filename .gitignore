@@ -10,3 +10,4 @@ target/
 # Netbeans
 nbproject/
 nbactions.xml
+/org.metaborg.spoofax.netbeans/target-netbeans/
