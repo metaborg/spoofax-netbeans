@@ -1,7 +1,9 @@
 package org.metaborg.spoofax.netbeans.project;
 
 import java.awt.Image;
+import javax.swing.Action;
 import org.netbeans.api.annotations.common.StaticResource;
+import org.netbeans.spi.project.ui.support.CommonProjectActions;
 import org.openide.nodes.FilterNode;
 import org.openide.nodes.Node;
 import org.openide.util.ImageUtilities;
@@ -17,12 +19,20 @@ public class SpoofaxProjectNode extends FilterNode {
         super(original,
                 new FilterNode.Children(original),
                 new ProxyLookup(original.getLookup(),
-                        project.getLookup(), Lookups.singleton(project)));
+                        project.getLookup(),
+                        Lookups.singleton(project)));
     }
 
     @Override
     public Image getIcon(int type) {
         return ImageUtilities.loadImage(ICON);
     }
-    
+
+    @Override
+    public Action[] getActions(boolean context) {
+        return new Action[]{
+            CommonProjectActions.closeProjectAction()
+        };
+    }
+   
 }

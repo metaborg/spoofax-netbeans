@@ -11,12 +11,12 @@ import org.openide.util.lookup.ServiceProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-@ServiceProvider(service = MIMEResolver.class, position = 1)
+@ServiceProvider(service = MIMEResolver.class)
 public class SpoofaxMIMEResolver extends MIMEResolver {
 
     private static final Logger log = LoggerFactory.getLogger(SpoofaxMIMEResolver.class);
 
-    private static final String SPOOFAX_MIME_TYPE = "application/spoofax";
+    public static final String SPOOFAX_MIME_TYPE = "application/spoofax";
 
     public SpoofaxMIMEResolver() {
         super(new String[]{ SPOOFAX_MIME_TYPE });
@@ -42,9 +42,9 @@ public class SpoofaxMIMEResolver extends MIMEResolver {
         }
         org.apache.commons.vfs2.FileObject vfo;
         try {
-            vfo = resourceService.resolve(fo.toURL().toString());
+            vfo = resourceService.resolve(fo.toURL().toExternalForm());
         } catch (RuntimeException ex) {
-            log.error("ResourceService could not resolve {}.", fo.toURL());
+            log.error("ResourceService could not resolve {}.", fo.getPath());
             return null;
         }
         try {

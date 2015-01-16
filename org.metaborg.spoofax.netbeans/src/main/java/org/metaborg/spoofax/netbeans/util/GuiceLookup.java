@@ -1,6 +1,8 @@
 package org.metaborg.spoofax.netbeans.util;
 
 import com.google.inject.Injector;
+import com.google.inject.Key;
+import com.google.inject.TypeLiteral;
 import java.util.Collection;
 import java.util.Collections;
 import org.openide.util.Lookup;
@@ -16,6 +18,10 @@ public class GuiceLookup extends Lookup {
 
     @Override
     public <T> T lookup(final Class<T> type) {
+        return injector.getInstance(type);
+    }
+
+    public <T> T lookup(final Key<T> type) {
         return injector.getInstance(type);
     }
 
