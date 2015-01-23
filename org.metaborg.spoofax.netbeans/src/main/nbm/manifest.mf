@@ -1,4 +1,5 @@
 Manifest-Version: 1.0
 OpenIDE-Module-Install: org/metaborg/spoofax/netbeans/Installer.class
+OpenIDE-Module-Layer: org/metaborg/spoofax/netbeans/layer.xml
 OpenIDE-Module-Localizing-Bundle: org/metaborg/spoofax/netbeans/Bundle.properties
 

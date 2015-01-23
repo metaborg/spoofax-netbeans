@@ -9,6 +9,7 @@
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <netbeans.version>RELEASE80</netbeans.version>
+        <github.global.server>github</github.global.server>
     </properties>
     <build>
         <plugins>
@@ -17,6 +18,14 @@
                 <artifactId>nbm-maven-plugin</artifactId>
                 <version>3.13</version>
                 <extensions>true</extensions>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>autoupdate</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -33,6 +42,36 @@
                 <version>2.4</version>
                 <configuration>
                     <useDefaultManifestFile>true</useDefaultManifestFile>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>com.github.github</groupId>
+                <artifactId>site-maven-plugin</artifactId>
+                <version>0.11</version>
+                <executions>
+                    <execution>
+                        <phase>deploy</phase>
+                        <goals>
+                            <goal>site</goal>
+                        </goals>
+                        <configuration>
+                            <message>Update files for ${project.version}</message>
+                            <noJekyll>true</noJekyll>
+                            <outputDirectory>${project.build.directory}/netbeans_site</outputDirectory>
+                            <branch>refs/heads/update-center</branch>
+                            <includes><include>**/*</include></includes>
+                            <repositoryName>spoofax-netbeans</repositoryName>
+                            <repositoryOwner>hendrikvanantwerpen</repositoryOwner>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-deploy-plugin</artifactId>
+                <version>2.8.2</version>
+                <configuration>
+                    <skip>true</skip>
                 </configuration>
             </plugin>
         </plugins>
@@ -195,6 +234,11 @@
             <groupId>io.reactivex</groupId>
             <artifactId>rxjava</artifactId>
             <version>1.0.4</version>
+        </dependency>
+        <dependency>
+            <groupId>org.netbeans.api</groupId>
+            <artifactId>org-netbeans-modules-autoupdate-services</artifactId>
+            <version>${netbeans.version}</version>
         </dependency>
     </dependencies>
 </project>
