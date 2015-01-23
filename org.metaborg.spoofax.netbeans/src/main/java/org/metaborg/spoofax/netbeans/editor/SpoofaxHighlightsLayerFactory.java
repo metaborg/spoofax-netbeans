@@ -20,17 +20,19 @@ import org.netbeans.spi.editor.highlighting.HighlightsContainer;
 import org.netbeans.spi.editor.highlighting.HighlightsLayer;
 import org.netbeans.spi.editor.highlighting.HighlightsLayerFactory;
 import org.netbeans.spi.editor.highlighting.ZOrder;
-import org.netbeans.spi.editor.highlighting.support.OffsetsBag;
 import org.openide.loaders.DataObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.metaborg.spoofax.core.syntax.ParseResult;
 import org.metaborg.spoofax.netbeans.filetype.SpoofaxFileService;
+import org.netbeans.spi.editor.highlighting.support.PositionsBag;
 import org.netbeans.spi.editor.hints.ErrorDescription;
 import org.netbeans.spi.editor.hints.ErrorDescriptionFactory;
 import org.netbeans.spi.editor.hints.HintsController;
 import org.netbeans.spi.editor.hints.Severity;
+import org.openide.text.NbDocument;
 import org.spoofax.interpreter.terms.IStrategoTerm;
+import rx.functions.Action1;
 
 @MimeRegistration(mimeType = "application/spoofax", service = HighlightsLayerFactory.class)
 public class SpoofaxHighlightsLayerFactory implements HighlightsLayerFactory {
@@ -44,8 +46,8 @@ public class SpoofaxHighlightsLayerFactory implements HighlightsLayerFactory {
         if ( dataObject != null ) {
             SpoofaxFileService fileService = dataObject.getLookup().lookup(SpoofaxFileService.class);
             if ( fileService != null ) {
-                addUpdateListener(document, fileService);
-                addErrorListener(document, fileService);
+                addTextUpdater(document, fileService);
+                addErrorHinter(document, fileService);
                 return new HighlightsLayer[]{
                     HighlightsLayer.create("Spoofax Syntax",
                             ZOrder.SYNTAX_RACK, true,
@@ -56,7 +58,7 @@ public class SpoofaxHighlightsLayerFactory implements HighlightsLayerFactory {
         return new HighlightsLayer[0];
     }
 
-    private void addUpdateListener(final Document document, final SpoofaxFileService fileService) {
+    private void addTextUpdater(final Document document, final SpoofaxFileService fileService) {
         document.addDocumentListener(new DocumentListener() {
 
             @Override
@@ -76,7 +78,7 @@ public class SpoofaxHighlightsLayerFactory implements HighlightsLayerFactory {
 
             private void notifyText() {
                 try {
-                    fileService.setText(document.getText(0, document.getLength()));
+                    fileService.text().onNext(document.getText(0, document.getLength()));
                 } catch (BadLocationException ex) {
                     log.error("Problem getting document text.",ex);
                 }
@@ -85,20 +87,24 @@ public class SpoofaxHighlightsLayerFactory implements HighlightsLayerFactory {
         });
     }
 
-    private void addErrorListener(final Document document, final SpoofaxFileService fileService) {
-        fileService.addParseListener(new SpoofaxFileService.ParseListener() {
+    private void addErrorHinter(final Document document, final SpoofaxFileService fileService) {
+        fileService.parseResult().subscribe(new Action1<ParseResult<IStrategoTerm>>(){
 
             @Override
-            public void parseResult(ParseResult<IStrategoTerm> parseResult) {
+            public void call(ParseResult<IStrategoTerm> parseResult) {
                 List<ErrorDescription> errorDescriptions = new ArrayList<ErrorDescription>();
                 for ( IMessage message : parseResult.messages ) {
-                    errorDescriptions.add(
-                            ErrorDescriptionFactory.createErrorDescription(
+                    try {
+                        errorDescriptions.add(
+                                ErrorDescriptionFactory.createErrorDescription(
                                         getSeverity(message),
                                         message.message(),
                                         document,
-                                        getStartPosition(message.region()),
-                                        getEndPosition(message.region())));
+                                        getStartPosition(document, message.region()),
+                                        getEndPosition(document, message.region())));
+                    } catch (BadLocationException ex) {
+                        log.error("Problem creating hint.", ex);
+                    }
                 }
                 HintsController.setErrors(document, "Parse Errors", errorDescriptions);
             }
@@ -123,28 +129,34 @@ public class SpoofaxHighlightsLayerFactory implements HighlightsLayerFactory {
         SpoofaxSyntaxHighlighter sh = (SpoofaxSyntaxHighlighter) document.getProperty(SpoofaxSyntaxHighlighter.class);
         if ( sh == null ) {
             document.putProperty(SpoofaxSyntaxHighlighter.class,
-                    sh = new SpoofaxSyntaxHighlighter(document, fileService));
-            fileService.addParseListener(sh);
+                    sh = new SpoofaxSyntaxHighlighter(document));
+            fileService.highlights().subscribe(sh);
         }
         return sh;
     }
 
-    private static class SpoofaxSyntaxHighlighter implements SpoofaxFileService.ParseListener {
+    private static class SpoofaxSyntaxHighlighter implements Action1<Iterable<IRegionStyle<IStrategoTerm>>> {
 
-        private final SpoofaxFileService fileService;
-        private final OffsetsBag bag;
+        private final Document document;
+        private final PositionsBag bag;
 
-        public SpoofaxSyntaxHighlighter(Document document, SpoofaxFileService fileService) {
-            this.fileService = fileService;
-            this.bag = new OffsetsBag(document);
+        public SpoofaxSyntaxHighlighter(Document document) {
+            this.document = document;
+            this.bag = new PositionsBag(document);
         }
 
         @Override
-        public void parseResult(final ParseResult<IStrategoTerm> parseResult) {
+        public void call(final Iterable<IRegionStyle<IStrategoTerm>> highlights) {
             bag.clear();
-            for ( IRegionStyle<IStrategoTerm> h : fileService.getHighlights(parseResult) ) {
-                bag.addHighlight(getStartOffset(h.region()), getEndOffset(h.region()),
-                        getAttributeSet(h.style()));
+            for ( IRegionStyle<IStrategoTerm> h : highlights ) {
+                try {
+                    bag.addHighlight(
+                            getStartPosition(document, h.region()),
+                            getEndPosition(document, h.region()),
+                            getAttributeSet(h.style()));
+                } catch (BadLocationException ex) {
+                    log.error("Problem creating highlight.", ex);
+                }
             }
         }
 
@@ -168,30 +180,18 @@ public class SpoofaxHighlightsLayerFactory implements HighlightsLayerFactory {
 
     }
 
-    private static int getStartOffset(final ISourceRegion region) {
-        return region.startOffset() >= 0 ? region.startOffset() : 0;
+    private static Position getStartPosition(Document doc, ISourceRegion region)
+            throws BadLocationException {
+        return NbDocument.createPosition(doc,
+                region.startOffset() >= 0 ? region.startOffset() : 0,
+                Position.Bias.Forward);
     }
 
-    private static int getEndOffset(final ISourceRegion region) {
-        return region.endOffset() >= 0 ? region.endOffset() + 1 : getStartOffset(region);
-    }
-
-    private static Position getStartPosition(final ISourceRegion region) {
-        return new Position() {
-            @Override
-            public int getOffset() {
-                return getStartOffset(region);
-            }
-        };
-    }
-
-    private static Position getEndPosition(final ISourceRegion region) {
-        return new Position() {
-            @Override
-            public int getOffset() {
-                return getEndOffset(region);
-            }
-        };
+    private static Position getEndPosition(Document doc, ISourceRegion region)
+            throws BadLocationException {
+        return region.endOffset() >= 0
+                ?  NbDocument.createPosition(doc, region.endOffset() + 1, Position.Bias.Forward)
+                : getStartPosition(doc, region);
     }
 
 }

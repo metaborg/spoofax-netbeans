@@ -191,5 +191,10 @@
             <artifactId>org-netbeans-spi-editor-hints</artifactId>
             <version>${netbeans.version}</version>
         </dependency>
+        <dependency>
+            <groupId>io.reactivex</groupId>
+            <artifactId>rxjava</artifactId>
+            <version>1.0.4</version>
+        </dependency>
     </dependencies>
 </project>
