@@ -1,11 +1,6 @@
 package org.metaborg.spoofax.netbeans.filetype;
 
 import java.io.IOException;
-import org.metaborg.spoofax.core.language.ILanguage;
-import org.metaborg.spoofax.core.language.ILanguageIdentifierService;
-import org.metaborg.spoofax.core.resource.IResourceService;
-import org.metaborg.spoofax.core.terms.ITermFactoryService;
-import org.metaborg.spoofax.netbeans.SpoofaxLookup;
 import org.openide.awt.ActionID;
 import org.openide.awt.ActionReference;
 import org.openide.awt.ActionReferences;
@@ -19,12 +14,10 @@ import org.openide.nodes.Children;
 import org.openide.nodes.Node;
 import org.openide.util.Lookup;
 import org.openide.util.NbBundle.Messages;
-import org.openide.util.lookup.AbstractLookup;
-import org.openide.util.lookup.InstanceContent;
+import org.openide.util.lookup.Lookups;
 import org.openide.util.lookup.ProxyLookup;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.spoofax.interpreter.terms.ITermFactory;
 
 @Messages({
     "LBL_Spoofax_LOADER=Spoofax Language File"
@@ -85,46 +78,13 @@ public class SpoofaxDataObject extends MultiDataObject {
     private static final Logger log = LoggerFactory.getLogger(SpoofaxDataObject.class);
 
     private final Lookup lookup;
-    private final InstanceContent lookupContent = new InstanceContent();
 
     public SpoofaxDataObject(FileObject pf, MultiFileLoader loader)
             throws DataObjectExistsException, IOException {
         super(pf, loader);
         lookup = new ProxyLookup( getCookieSet().getLookup(),
-                new AbstractLookup(lookupContent));
-        initLanguageServices(pf);
+                Lookups.fixed(new SpoofaxFileService(pf)));
         registerEditor(SpoofaxMIMEResolver.SPOOFAX_MIME_TYPE, false);
-    }
-
-    private void initLanguageServices(FileObject pf) throws IOException {
-        SpoofaxLookup spoofax = Lookup.getDefault().lookup(SpoofaxLookup.class);
-        if ( spoofax == null ) return;
-
-        IResourceService resourceService =
-                spoofax.lookup(IResourceService.class);
-        org.apache.commons.vfs2.FileObject vfo;
-        try {
-            vfo = resourceService.resolve(pf.toURL().toString());
-        } catch (RuntimeException ex) {
-            log.error("Failed to resolve {}.",pf.toURL(),ex);
-            return;
-        }
-
-        ILanguageIdentifierService languageIdentifierService =
-                spoofax.lookup(ILanguageIdentifierService.class);
-        ILanguage lang;
-        lang = languageIdentifierService.identify(vfo);
-        if ( lang == null ) {
-            log.error("Failed to identify language for {}.",pf.toURL());
-            return;
-        }
-
-        ITermFactoryService termFactoryService =
-                spoofax.lookup(ITermFactoryService.class);
-        ITermFactory termFactory = termFactoryService.get(lang);
-
-        lookupContent.add(lang);
-        lookupContent.add(termFactory);
     }
 
     @Override
