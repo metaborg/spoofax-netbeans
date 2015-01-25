@@ -10,6 +10,9 @@ import javax.swing.text.Document;
 import javax.swing.text.Position;
 import javax.swing.text.SimpleAttributeSet;
 import javax.swing.text.StyleConstants;
+import org.metaborg.spoofax.core.analysis.AnalysisFileResult;
+import org.metaborg.spoofax.core.analysis.AnalysisResult;
+import org.metaborg.spoofax.core.language.ILanguage;
 import org.metaborg.spoofax.core.messages.IMessage;
 import org.metaborg.spoofax.core.messages.ISourceRegion;
 import org.metaborg.spoofax.core.style.IRegionStyle;
@@ -24,13 +27,19 @@ import org.openide.loaders.DataObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.metaborg.spoofax.core.syntax.ParseResult;
+import org.metaborg.spoofax.netbeans.guice.SpoofaxLookup;
 import org.metaborg.spoofax.netbeans.filetype.SpoofaxFileService;
+import org.metaborg.spoofax.netbeans.project.SpoofaxProjectService;
+import org.netbeans.api.project.FileOwnerQuery;
+import org.netbeans.api.project.Project;
 import org.netbeans.spi.editor.highlighting.support.PositionsBag;
 import org.netbeans.spi.editor.hints.ErrorDescription;
 import org.netbeans.spi.editor.hints.ErrorDescriptionFactory;
 import org.netbeans.spi.editor.hints.HintsController;
 import org.netbeans.spi.editor.hints.Severity;
+import org.openide.filesystems.FileObject;
 import org.openide.text.NbDocument;
+import org.openide.util.Lookup;
 import org.spoofax.interpreter.terms.IStrategoTerm;
 import rx.functions.Action1;
 
@@ -47,7 +56,13 @@ public class SpoofaxHighlightsLayerFactory implements HighlightsLayerFactory {
             SpoofaxFileService fileService = dataObject.getLookup().lookup(SpoofaxFileService.class);
             if ( fileService != null ) {
                 addTextUpdater(document, fileService);
-                addErrorHinter(document, fileService);
+                addParseResults(document, fileService);
+                Project project = FileOwnerQuery.getOwner(dataObject.getPrimaryFile());
+                SpoofaxProjectService projectService = project.getLookup().lookup(SpoofaxProjectService.class);
+                if ( projectService != null ) {
+                    addAnalysisResults(document, dataObject.getPrimaryFile(),
+                            fileService.getLanguage(), projectService);
+                }
                 return new HighlightsLayer[]{
                     HighlightsLayer.create("Spoofax Syntax",
                             ZOrder.SYNTAX_RACK, true,
@@ -87,9 +102,8 @@ public class SpoofaxHighlightsLayerFactory implements HighlightsLayerFactory {
         });
     }
 
-    private void addErrorHinter(final Document document, final SpoofaxFileService fileService) {
+    private void addParseResults(final Document document, final SpoofaxFileService fileService) {
         fileService.parseResult().subscribe(new Action1<ParseResult<IStrategoTerm>>(){
-
             @Override
             public void call(ParseResult<IStrategoTerm> parseResult) {
                 List<ErrorDescription> errorDescriptions = new ArrayList<ErrorDescription>();
@@ -106,21 +120,39 @@ public class SpoofaxHighlightsLayerFactory implements HighlightsLayerFactory {
                         log.error("Problem creating hint.", ex);
                     }
                 }
-                HintsController.setErrors(document, "Parse Errors", errorDescriptions);
+                HintsController.setErrors(document, "Spoofax Parsing", errorDescriptions);
             }
+        });
+    }
 
-            private Severity getSeverity(IMessage message) {
-                switch (message.severity()) {
-                    case ERROR:
-                        return Severity.ERROR;
-                    case WARNING:
-                        return Severity.WARNING;
-                    case NOTE:
-                        return Severity.HINT;
+    private void addAnalysisResults(final Document document, final FileObject file,
+            final ILanguage language, final SpoofaxProjectService projectService) {
+        projectService.analysis().subscribe(new Action1<AnalysisResult<IStrategoTerm,IStrategoTerm>>() {
+            @Override
+            public void call(AnalysisResult<IStrategoTerm,IStrategoTerm> analysisResult) {
+                if ( !analysisResult.language.equals(language) ) { return; }
+                SpoofaxLookup spoofax = Lookup.getDefault().lookup(SpoofaxLookup.class);
+                List<ErrorDescription> errorDescriptions = new ArrayList<ErrorDescription>();
+                for ( AnalysisFileResult<IStrategoTerm,IStrategoTerm> fileResult : analysisResult.fileResults ) {
+                    FileObject fo = spoofax.fromVFS(fileResult.file());
+                    if ( fo.equals(file) ) {
+                        for ( IMessage message : fileResult.messages() ) {
+                            try {
+                                errorDescriptions.add(
+                                        ErrorDescriptionFactory.createErrorDescription(
+                                                getSeverity(message),
+                                                message.message(),
+                                                document,
+                                                getStartPosition(document, message.region()),
+                                                getEndPosition(document, message.region())));
+                            } catch (BadLocationException ex) {
+                                log.error("Problem creating hint.", ex);
+                            }
+                        }
+                    }
                 }
-                return Severity.VERIFIER;
+                HintsController.setErrors(document, "Spoofax Analysis", errorDescriptions);
             }
-
         });
     }
 
@@ -192,6 +224,18 @@ public class SpoofaxHighlightsLayerFactory implements HighlightsLayerFactory {
         return region.endOffset() >= 0
                 ?  NbDocument.createPosition(doc, region.endOffset() + 1, Position.Bias.Forward)
                 : getStartPosition(doc, region);
+    }
+
+    private Severity getSeverity(IMessage message) {
+        switch (message.severity()) {
+            case ERROR:
+                return Severity.ERROR;
+            case WARNING:
+                return Severity.WARNING;
+            case NOTE:
+                return Severity.HINT;
+        }
+        return Severity.VERIFIER;
     }
 
 }

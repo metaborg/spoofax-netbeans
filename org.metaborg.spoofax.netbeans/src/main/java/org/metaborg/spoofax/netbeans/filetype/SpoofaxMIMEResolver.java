@@ -3,7 +3,7 @@ package org.metaborg.spoofax.netbeans.filetype;
 import org.metaborg.spoofax.core.language.ILanguage;
 import org.metaborg.spoofax.core.language.ILanguageIdentifierService;
 import org.metaborg.spoofax.core.resource.IResourceService;
-import org.metaborg.spoofax.netbeans.SpoofaxLookup;
+import org.metaborg.spoofax.netbeans.guice.SpoofaxLookup;
 import org.openide.filesystems.FileObject;
 import org.openide.filesystems.MIMEResolver;
 import org.openide.util.Lookup;

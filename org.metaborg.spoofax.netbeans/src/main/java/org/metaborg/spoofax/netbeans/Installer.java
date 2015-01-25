@@ -1,5 +1,6 @@
 package org.metaborg.spoofax.netbeans;
 
+import org.metaborg.spoofax.netbeans.guice.SpoofaxLookup;
 import java.util.List;
 import java.util.prefs.PreferenceChangeEvent;
 import java.util.prefs.PreferenceChangeListener;

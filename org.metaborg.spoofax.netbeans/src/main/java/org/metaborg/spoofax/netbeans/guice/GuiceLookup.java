@@ -1,4 +1,4 @@
-package org.metaborg.spoofax.netbeans.util;
+package org.metaborg.spoofax.netbeans.guice;
 
 import com.google.inject.Injector;
 import com.google.inject.Key;

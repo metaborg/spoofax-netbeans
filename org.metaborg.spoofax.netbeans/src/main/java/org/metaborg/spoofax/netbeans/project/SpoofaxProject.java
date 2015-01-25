@@ -17,7 +17,8 @@ public class SpoofaxProject implements Project {
         this.state = state;
         this.lookup = Lookups.fixed(
                 new SpoofaxProjectInfo(this),
-                new SpoofaxProjectView(this));
+                new SpoofaxProjectView(this),
+                new SpoofaxProjectService(projectDirectory));
     }
 
     @Override

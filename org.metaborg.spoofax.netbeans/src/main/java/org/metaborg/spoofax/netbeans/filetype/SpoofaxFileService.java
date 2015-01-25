@@ -4,18 +4,16 @@ import com.google.inject.Key;
 import com.google.inject.TypeLiteral;
 import java.io.IOException;
 import java.util.concurrent.Callable;
-import org.apache.commons.vfs2.FileNotFoundException;
 import org.apache.commons.vfs2.FileTypeHasNoContentException;
 import org.metaborg.spoofax.core.language.ILanguage;
 import org.metaborg.spoofax.core.language.ILanguageIdentifierService;
-import org.metaborg.spoofax.core.resource.IResourceService;
 import org.metaborg.spoofax.core.style.ICategorizerService;
 import org.metaborg.spoofax.core.style.IRegionCategory;
 import org.metaborg.spoofax.core.style.IRegionStyle;
 import org.metaborg.spoofax.core.style.IStylerService;
 import org.metaborg.spoofax.core.syntax.ISyntaxService;
 import org.metaborg.spoofax.core.syntax.ParseResult;
-import org.metaborg.spoofax.netbeans.SpoofaxLookup;
+import org.metaborg.spoofax.netbeans.guice.SpoofaxLookup;
 import org.openide.filesystems.FileChangeAdapter;
 import org.openide.filesystems.FileChangeListener;
 import org.openide.filesystems.FileEvent;
@@ -36,7 +34,7 @@ public class SpoofaxFileService {
     private static final Logger log = LoggerFactory.getLogger(SpoofaxFileService.class);
 
     private final FileObject fileObject;
-    private final IResourceService resourceService;
+    private final SpoofaxLookup spoofax;
     private final ILanguage language;
     private final ISyntaxService<IStrategoTerm> syntaxService;
     private final ICategorizerService<IStrategoTerm, IStrategoTerm> categorizerService;
@@ -50,11 +48,10 @@ public class SpoofaxFileService {
 
     public SpoofaxFileService(FileObject fileObject) throws IOException {
         this.fileObject = fileObject;
-        SpoofaxLookup spoofax = Lookup.getDefault().lookup(SpoofaxLookup.class);
-        resourceService = spoofax.lookup(IResourceService.class);
+        spoofax = Lookup.getDefault().lookup(SpoofaxLookup.class);
         ILanguageIdentifierService languageIdentifierService =
                 spoofax.lookup(ILanguageIdentifierService.class);
-        this.language = languageIdentifierService.identify(getVFO());
+        this.language = languageIdentifierService.identify(spoofax.toVFS(fileObject));
         if ( this.language == null ) {
             throw new FileTypeHasNoContentException("Unable to identify language.");
         }
@@ -85,14 +82,6 @@ public class SpoofaxFileService {
         }
     }
 
-    private org.apache.commons.vfs2.FileObject getVFO() throws FileNotFoundException {
-        try {
-            return  resourceService.resolve(fileObject.toURL().toString());
-        } catch (RuntimeException ex) {
-            throw new FileNotFoundException(ex);
-        }
-    }
-
     public ILanguage getLanguage() {
         return language;
     }
@@ -115,7 +104,7 @@ public class SpoofaxFileService {
             return Observable.from(RP.submit(new Callable<ParseResult<IStrategoTerm>>(){
                 @Override
                 public ParseResult<IStrategoTerm> call() throws Exception {
-                    return syntaxService.parse(text, getVFO(), language);
+                    return syntaxService.parse(text, spoofax.toVFS(fileObject), language);
                 }
             }));
         }

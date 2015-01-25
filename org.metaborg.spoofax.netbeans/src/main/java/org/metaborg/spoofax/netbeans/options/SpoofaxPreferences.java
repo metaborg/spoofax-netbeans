@@ -5,7 +5,7 @@ import java.util.List;
 import java.util.prefs.BackingStoreException;
 import java.util.prefs.PreferenceChangeListener;
 import java.util.prefs.Preferences;
-import org.metaborg.spoofax.netbeans.SpoofaxLookup;
+import org.metaborg.spoofax.netbeans.guice.SpoofaxLookup;
 import org.openide.util.Exceptions;
 import org.openide.util.NbPreferences;
 import org.slf4j.Logger;
